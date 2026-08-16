@@ -1,1 +1,26 @@
+# Environment variables
 .env
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Project Generated Data & Media
+downloades/
+vector_db/
+*.wav
+
+# Project Setup Guide (as requested)
+RUN_GUIDE.md
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
