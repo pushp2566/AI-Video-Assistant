@@ -1,21 +1,47 @@
-import streamlit as st
+import os
 import time
+import streamlit as st
 from dotenv import load_dotenv
-from utils.audio_processor import process_input
-from core.transcriber import transcribe_all
-from core.summarizer import summarize, generate_title
-from core.extractor import extract_action_items, extract_key_decisions, extract_questions
-from core.rag_engine import build_rag_chain, ask_question
 
-load_dotenv()
-
-# ─── Page Config ────────────────────────────────────────────────────────────────
+# ─── Page Config Must Be First Streamlit Command ────────────────────────────────
 st.set_page_config(
     page_title="AI Video Assistant",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+load_dotenv()
+
+# Ensure pydub/ffmpeg is discoverable when running inside the project's venv.
+from pydub.utils import which as _pydub_which
+venv_ffmpeg = os.path.join(os.path.dirname(__file__), ".venv", "Scripts", "ffmpeg.exe")
+if _pydub_which("ffmpeg") is None and os.path.exists(venv_ffmpeg):
+    os.environ["PATH"] = os.path.dirname(venv_ffmpeg) + os.pathsep + os.environ.get("PATH", "")
+    try:
+        from pydub import AudioSegment as _AudioSegment
+        _AudioSegment.converter = venv_ffmpeg
+    except Exception:
+        pass
+
+# Lazy import functions to keep startup instant
+def get_pipeline_modules():
+    from utils.audio_processor import process_input
+    from core.transcriber import transcribe_all
+    from core.summarizer import summarize, generate_title
+    from core.extractor import extract_action_items, extract_key_decisions, extract_questions
+    from core.rag_engine import build_rag_chain, ask_question
+    return {
+        "process_input": process_input,
+        "transcribe_all": transcribe_all,
+        "summarize": summarize,
+        "generate_title": generate_title,
+        "extract_action_items": extract_action_items,
+        "extract_key_decisions": extract_key_decisions,
+        "extract_questions": extract_questions,
+        "build_rag_chain": build_rag_chain,
+        "ask_question": ask_question,
+    }
 
 # ─── Custom CSS ─────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -39,14 +65,14 @@ st.markdown("""
 }
 
 /* ── Global Reset ── */
-html, body, [class*="css"] {
+html, body {
     font-family: 'JetBrains Mono', monospace;
-    background-color: var(--bg) !important;
-    color: var(--text) !important;
+    background-color: var(--bg);
+    color: var(--text);
 }
 
 .stApp {
-    background: var(--bg) !important;
+    background-color: var(--bg) !important;
 }
 
 /* Animated grid background */
@@ -376,33 +402,34 @@ if run_btn:
             st.session_state.pipeline_steps[key] = state
 
         try:
+            mods = get_pipeline_modules()
             with progress_placeholder.container():
                 st.info("⚙️ Pipeline running — see sidebar for live status…")
 
             update_step("audio", "active")
-            chunks = process_input(source)
+            chunks = mods["process_input"](source)
             update_step("audio", "done")
 
             update_step("transcript", "active")
-            transcript = transcribe_all(chunks, language)
+            transcript = mods["transcribe_all"](chunks, language)
             update_step("transcript", "done")
 
             update_step("title", "active")
-            title = generate_title(transcript)
+            title = mods["generate_title"](transcript)
             update_step("title", "done")
 
             update_step("summary", "active")
-            summary = summarize(transcript)
+            summary = mods["summarize"](transcript)
             update_step("summary", "done")
 
             update_step("extract", "active")
-            action_items  = extract_action_items(transcript)
-            decisions     = extract_key_decisions(transcript)
-            questions     = extract_questions(transcript)
+            action_items  = mods["extract_action_items"](transcript)
+            decisions     = mods["extract_key_decisions"](transcript)
+            questions     = mods["extract_questions"](transcript)
             update_step("extract", "done")
 
             update_step("rag", "active")
-            rag_chain = build_rag_chain(transcript)
+            rag_chain = mods["build_rag_chain"](transcript)
             update_step("rag", "done")
 
             st.session_state.result = {
@@ -516,7 +543,8 @@ if st.session_state.result:
 
     if send_btn and user_input.strip():
         with st.spinner("Thinking…"):
-            answer = ask_question(r["rag_chain"], user_input.strip())
+            mods = get_pipeline_modules()
+            answer = mods["ask_question"](r["rag_chain"], user_input.strip())
         st.session_state.chat_history.append({"role": "user",      "content": user_input.strip()})
         st.session_state.chat_history.append({"role": "assistant", "content": answer})
         st.rerun()

@@ -2,27 +2,40 @@ import yt_dlp
 from pydub import AudioSegment
 import os
 
+import shutil
+
 DOWNLOAD_DIR = 'downloades'
 os.makedirs(DOWNLOAD_DIR,exist_ok = True)
 
 def download_youtube_audio(url :str) ->str:
-    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
+    output_path = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": output_path,
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "wav",
-                "preferredquality": "192",
-            }
-        ],
         "quiet": True,
+        "nocheckcertificate": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
+            }
+        }
     }
+    
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if ffmpeg_bin:
+        ydl_opts["ffmpeg_location"] = os.path.dirname(ffmpeg_bin)
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
-    return filename
+        raw_filename = ydl.prepare_filename(info)
+    
+    wav_filename = convert_to_wav(raw_filename)
+    if os.path.exists(raw_filename) and raw_filename != wav_filename:
+        try:
+            os.remove(raw_filename)
+        except Exception:
+            pass
+    return wav_filename
 
 
 
@@ -52,10 +65,15 @@ def chunk_audio(wav_path : str , chunk_minutes : int = 10) -> list:
     return chunks
 
 def process_input(source: str) -> list:
+    source = source.strip()
     if source.startswith("http://") or source.startswith("https://"):
         print("Detected YouTube URL. Downloading audio...")
         wav_path = download_youtube_audio(source)
     else:
+        if not os.path.exists(source):
+            raise FileNotFoundError(
+                f"Invalid input: '{source[:60]}...' is neither a valid YouTube URL nor an existing local file. Please enter a YouTube link (e.g., https://www.youtube.com/watch?v=...) or a valid local file path."
+            )
         print("Detected local file. Converting to WAV...")
         wav_path = convert_to_wav(source)
 
