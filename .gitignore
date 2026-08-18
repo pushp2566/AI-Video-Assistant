@@ -24,3 +24,8 @@ RUN_GUIDE.md
 .vscode/
 .idea/
 *.swp
+
+# Local Helper Scripts
+.venv_install_scripts/
+install_ffmpeg.py
+run_demo.py
