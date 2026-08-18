@@ -41,7 +41,7 @@
 1. **Audio Ingestion & Preprocessing (`utils/audio_processor.py`)**:
    - Downloads audio from YouTube URLs using `yt-dlp` with `android`/`web` player fallback options to bypass YouTube anti-bot restriction 403.
    - Converts media files to standardized 16kHz mono `.wav` audio format via `pydub` and `FFmpeg`.
-   - Chunks long audio files into **10-minute segments** for memory safety.
+   - Chunks long audio files into **10-minute segments** for memory safety (OOM prevention).
 
 2. **Multilingual Transcription (`core/transcriber.py`)**:
    - **English Option**: Runs local **OpenAI Whisper** (`base` / `small` model) on CPU/GPU.
@@ -74,35 +74,46 @@
 
 If you are new to AI/ML terms, use these simple explanations and real-world analogies to understand every piece of technology used in this project:
 
-### 1. LLM (Large Language Model)
+### 1. Audio Chunking & Memory Safety (OOM Prevention)
+- **Simple Analogy (Eating Pizza Slices vs. One Giant Bite)**: 
+  - Imagine trying to swallow a whole 2-hour giant pizza in a single bite. Your mouth can't hold it, and you choke!
+  - Instead, you cut the pizza into small 10-minute slices and eat them one by one. Your stomach easily handles one slice at a time.
+- **Technical Meaning**: 
+  - A 2-hour raw `.wav` audio file can be **1 to 2 Gigabytes (GB)** in size. When Whisper processes audio, it creates massive mathematical tensors in computer memory (RAM).
+  - If you load a 2-hour file all at once, Python requests 4GB–8GB of RAM simultaneously. If your computer doesn't have enough RAM, it crashes with an **Out-Of-Memory (OOM)** error.
+- **In This Project**: `chunk_audio(wav_path, chunk_minutes=10)` in `utils/audio_processor.py` cuts the audio into 10-minute pieces. Python processes 10 minutes (~50 MB) at a time, frees up RAM, and moves to the next piece. This allows even laptops with modest RAM to transcribe long 3-hour videos smoothly without crashing!
+
+---
+
+### 2. LLM (Large Language Model)
 - **Simple Analogy**: Think of an LLM as a super-smart human assistant who has read almost the entire internet and can write, translate, summarize, and answer questions.
 - **Technical Meaning**: A deep learning AI model trained on massive text datasets to understand and generate human language.
 - **In This Project**: We use **Mistral AI** (`mistral-small-latest`) as our LLM for writing summaries, extracting action items, and answering chat questions.
 
 ---
 
-### 2. Speech-to-Text (STT) / ASR (Automatic Speech Recognition)
+### 3. Speech-to-Text (STT) / ASR (Automatic Speech Recognition)
 - **Simple Analogy**: Dictating a message on your phone's voice keyboard and having it turn your voice into text.
 - **Technical Meaning**: An AI pipeline that processes acoustic audio signals and converts spoken words into written text transcripts.
 - **In This Project**: We use **OpenAI Whisper** for English speech and **Sarvam AI** for Hinglish/Hindi speech.
 
 ---
 
-### 3. OpenAI Whisper
+### 4. OpenAI Whisper
 - **Simple Analogy**: An AI listening expert that listens to an audio file on your computer and writes down every spoken word.
 - **Technical Meaning**: An open-source, neural network-based automatic speech recognition model trained on 680,000 hours of multilingual audio.
 - **In This Project**: It runs locally on your laptop CPU/GPU (`WHISPER_MODEL=base`) so transcription is **100% free** and private.
 
 ---
 
-### 4. Sarvam AI
+### 5. Sarvam AI
 - **Simple Analogy**: An AI specialized in understanding Indian languages and accents (like Hinglish or Hindi) and translating them to English.
 - **Technical Meaning**: An AI cloud platform designed specifically for Indic languages.
 - **In This Project**: When a user selects `hinglish`, audio is sent to Sarvam's API model (`saaras:v2.5`), which translates spoken Hinglish/Hindi directly into English text.
 
 ---
 
-### 5. RAG (Retrieval-Augmented Generation)
+### 6. RAG (Retrieval-Augmented Generation)
 - **Simple Analogy (Open-Book Exam)**: 
   - *Without RAG (Closed-Book)*: Asking an AI a question about *your private meeting*. The AI tries to guess or lies (hallucinates) because it never attended your meeting.
   - *With RAG (Open-Book)*: When you ask a question, the system first opens the meeting transcript, finds the exact 2-3 paragraphs containing the answer, pastes those paragraphs into the AI's prompt, and tells the AI: *"Read these 2 paragraphs and answer the question based strictly on them."*
@@ -111,63 +122,63 @@ If you are new to AI/ML terms, use these simple explanations and real-world anal
 
 ---
 
-### 6. Embeddings (Vector Embeddings)
+### 7. Embeddings (Vector Embeddings)
 - **Simple Analogy**: Imagine giving every sentence a unique GPS coordinate map based on its meaning. Sentences with similar meanings (e.g. *"The meeting starts at 5 PM"* and *"We will begin at 17:00"*) get placed right next to each other on the map, even if they use completely different words!
 - **Technical Meaning**: A mathematical process that converts text into high-dimensional numerical arrays (vectors). 
 - **In This Project**: We use HuggingFace's `all-MiniLM-L6-v2` model to convert 500-character transcript chunks into 384-dimensional vectors.
 
 ---
 
-### 7. Vector Database (ChromaDB)
+### 8. Vector Database (ChromaDB)
 - **Simple Analogy**: A specialized digital library filing cabinet designed to store and search text based on **meaning** rather than exact keyword matches.
 - **Technical Meaning**: A database optimized for storing, indexing, and searching high-dimensional vector embeddings using spatial algorithms (like Cosine Similarity or Euclidean distance).
 - **In This Project**: **ChromaDB** runs locally inside your project folder (`vector_db/`) to store your transcript embeddings.
 
 ---
 
-### 8. Text Chunking & Overlap
+### 9. Text Chunking & Overlap
 - **Simple Analogy**: Cutting a long 50-page book into small 1-page index cards so you can easily search for topics. Overlapping the edges ensures no sentence is chopped in half across two cards.
 - **Technical Meaning**: Segmenting large text bodies into smaller windows (e.g., 500 characters) with overlapping boundaries (e.g., 50 characters) to preserve contextual continuity.
 - **In This Project**: Used in `core/vector_store.py` (`RecursiveCharacterTextSplitter`) before saving chunks to ChromaDB.
 
 ---
 
-### 9. Map-Reduce Summarization
+### 10. Map-Reduce Summarization
 - **Simple Analogy**: Summarizing a multi-chapter book by assigning 5 people to summarize 1 chapter each (**Map**), and then having a chief editor combine those 5 mini-summaries into 1 final summary (**Reduce**).
 - **Technical Meaning**: A distributed processing pattern where text chunks are independently processed/summarized (*Map step*) and their outputs are combined into a final synthesized result (*Reduce step*).
 - **In This Project**: Used in `core/summarizer.py` so long 2-hour meeting transcripts can be summarized without hitting LLM input character limits.
 
 ---
 
-### 10. LangChain & LCEL (LangChain Expression Language)
+### 11. LangChain & LCEL (LangChain Expression Language)
 - **Simple Analogy**: LEGO blocks for building AI applications. Instead of writing complex manual code to connect prompts, LLMs, and parsers, LangChain lets you snap them together using the pipe `|` symbol.
 - **Technical Meaning**: A framework for building LLM-powered applications. LCEL is its declarative syntax (e.g., `retriever | prompt | llm | StrOutputParser()`).
 - **In This Project**: Used throughout `core/rag_engine.py`, `core/summarizer.py`, and `core/extractor.py`.
 
 ---
 
-### 11. FFmpeg & Pydub
+### 12. FFmpeg & Pydub
 - **Simple Analogy**: A universal Swiss Army knife tool for audio and video files. It can cut, resize, change format, change volume, and change sample rate.
 - **Technical Meaning**: `FFmpeg` is an open-source multimedia processing framework binary. `pydub` is a Python wrapper library that controls FFmpeg commands easily in code.
 - **In This Project**: Used in `utils/audio_processor.py` to resample media into standardized **16,000 Hz single-channel (mono) WAV** audio files.
 
 ---
 
-### 12. yt-dlp
+### 13. yt-dlp
 - **Simple Analogy**: A command-line program that can download video/audio streams from YouTube and other video sites.
 - **Technical Meaning**: An active open-source fork of `youtube-dl` with updated extractors and anti-bot bypass mechanisms.
 - **In This Project**: Downloads raw YouTube audio when a user inputs a YouTube link.
 
 ---
 
-### 13. Streamlit & Session State
+### 14. Streamlit & Session State
 - **Simple Analogy**: A tool that allows Python developers to turn Python scripts into interactive websites with buttons, inputs, sidebars, and dark themes without writing complex HTML/JS from scratch. **Session state** is the app's notebook where it remembers what you clicked or typed even when the webpage refreshes.
 - **Technical Meaning**: A Python web frontend framework. `st.session_state` preserves state variables across user execution reruns.
 - **In This Project**: Renders the complete web interface (`app.py`).
 
 ---
 
-### 14. Hallucination (AI Hallucination)
+### 15. Hallucination (AI Hallucination)
 - **Simple Analogy**: When an AI model confidently makes up facts or gives a completely false answer because it doesn't know the real answer.
 - **Technical Meaning**: An unexpected or incorrect output produced by a generative AI model that is not grounded in real data.
 - **In This Project**: Prevented by our **RAG System** which forces Mistral AI to answer strictly using retrieved meeting transcript text.
