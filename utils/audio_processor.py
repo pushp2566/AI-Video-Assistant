@@ -16,9 +16,16 @@ def download_youtube_audio(url: str) -> str:
     # Check if YOUTUBE_COOKIES is provided via environment/secrets
     cookiefile_path = None
     cookies_content = os.getenv("YOUTUBE_COOKIES")
+    if not cookies_content:
+        try:
+            import streamlit as st
+            cookies_content = st.secrets.get("YOUTUBE_COOKIES", None)
+        except Exception:
+            pass
+
     if cookies_content:
         cookiefile_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
-        cleaned_cookies = cookies_content.strip()
+        cleaned_cookies = str(cookies_content).strip()
         with open(cookiefile_path, "w", encoding="utf-8") as f:
             f.write(cleaned_cookies)
 
