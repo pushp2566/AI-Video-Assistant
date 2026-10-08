@@ -5,7 +5,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
 CHROMA_DIR = "vector_db"
-COLLECTION_NAME = "meeting_transcript"
+COLLECTION_NAME = "video_transcript"
 EMBEDDING_MODEL  = "all-MiniLM-L6-v2"
 
 def get_embeddings():
@@ -18,7 +18,7 @@ import uuid
 
 def build_vector_store(transcript : str)->Chroma:
     # Generate unique collection name per analysis to prevent cross-video retrieval leakage
-    unique_collection = f"meeting_{uuid.uuid4().hex[:12]}"
+    unique_collection = f"video_{uuid.uuid4().hex[:12]}"
     print(f"Building isolated vector Store ({unique_collection})...")
 
     splitter = RecursiveCharacterTextSplitter(
