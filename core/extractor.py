@@ -8,7 +8,23 @@ import os
 
 
 def get_llm():
-    return ChatMistralAI(model = "mistral-small-latest", mistral_api_key = os.getenv("MISTRAL_API_KEY"),temperature=0.2)
+    if os.getenv("GROQ_API_KEY"):
+        from langchain_groq import ChatGroq
+        return ChatGroq(
+            model_name="llama-3.1-70b-versatile",
+            groq_api_key=os.getenv("GROQ_API_KEY"),
+            temperature=0.2,
+        )
+    elif os.getenv("OLLAMA_MODEL"):
+        from langchain_community.chat_models import ChatOllama
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        return ChatOllama(
+            model=os.getenv("OLLAMA_MODEL"),
+            base_url=base_url,
+            temperature=0.2,
+        )
+    from langchain_mistralai import ChatMistralAI
+    return ChatMistralAI(model="mistral-small-latest", mistral_api_key=os.getenv("MISTRAL_API_KEY"), temperature=0.2)
 
 
 
