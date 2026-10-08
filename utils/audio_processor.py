@@ -18,8 +18,9 @@ def download_youtube_audio(url: str) -> str:
     cookies_content = os.getenv("YOUTUBE_COOKIES")
     if cookies_content:
         cookiefile_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
+        cleaned_cookies = cookies_content.strip()
         with open(cookiefile_path, "w", encoding="utf-8") as f:
-            f.write(cookies_content)
+            f.write(cleaned_cookies)
 
     base_opts = {
         "format": "bestaudio/best",
