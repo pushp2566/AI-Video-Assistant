@@ -102,27 +102,33 @@ def fetch_rapidapi_youtube_transcript(video_id: str) -> str:
         return None
 
     import requests
-    url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
-    querystring = {"video_id": video_id}
+    # Primary RapidAPI endpoint: youtube-transcript3
+    url = f"https://youtube-transcript3.p.rapidapi.com/api/transcript-with-url?url=https://www.youtube.com/watch?v={video_id}"
     headers = {
         "x-rapidapi-key": rapidapi_key,
-        "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com"
+        "x-rapidapi-host": "youtube-transcript3.p.rapidapi.com"
     }
 
     try:
-        response = requests.get(url, headers=headers, params=querystring, timeout=12)
+        response = requests.get(url, headers=headers, timeout=12)
         if response.status_code == 200:
             data = response.json()
             text_parts = []
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict):
-                        if "transcripts" in item and isinstance(item["transcripts"], list):
-                            for t in item["transcripts"]:
-                                if isinstance(t, dict) and "text" in t:
-                                    text_parts.append(str(t["text"]))
-                        elif "text" in item:
+            # Check response structure
+            if isinstance(data, dict):
+                transcript_data = data.get("task_result", {}).get("transcript") or data.get("transcript") or data.get("text")
+                if isinstance(transcript_data, list):
+                    for item in transcript_data:
+                        if isinstance(item, dict) and "text" in item:
                             text_parts.append(str(item["text"]))
+                        elif isinstance(item, str):
+                            text_parts.append(item)
+                elif isinstance(transcript_data, str):
+                    return transcript_data.strip()
+            elif isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and "text" in item:
+                        text_parts.append(str(item["text"]))
             if text_parts:
                 return " ".join(text_parts).strip()
     except Exception as e:
