@@ -31,13 +31,26 @@ def download_youtube_audio(url: str) -> str:
     if cookiefile_path and os.path.exists(cookiefile_path):
         base_opts["cookiefile"] = cookiefile_path
 
-    configs = [
-        # Strategy 1: iOS & Android client with web fallback
+    configs = []
+    
+    # If cookies are present, try standard web/mweb first as it is authenticated
+    if cookiefile_path and os.path.exists(cookiefile_path):
+        configs.append({
+            **base_opts,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["web", "mweb"]
+                }
+            }
+        })
+
+    configs.extend([
+        # Strategy 1: iOS & Android client
         {
             **base_opts,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["ios", "android", "web"]
+                    "player_client": ["ios", "android"]
                 }
             }
         },
@@ -50,14 +63,14 @@ def download_youtube_audio(url: str) -> str:
                 }
             }
         },
-        # Strategy 3: Standard default with user-agent
+        # Strategy 3: Standard default
         {
             **base_opts,
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             }
         }
-    ]
+    ])
 
     last_error = None
     for ydl_opts in configs:
