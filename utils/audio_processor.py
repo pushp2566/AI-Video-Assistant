@@ -7,36 +7,72 @@ import shutil
 DOWNLOAD_DIR = 'downloades'
 os.makedirs(DOWNLOAD_DIR,exist_ok = True)
 
-def download_youtube_audio(url :str) ->str:
+def download_youtube_audio(url: str) -> str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": output_path,
-        "quiet": True,
-        "nocheckcertificate": True,
-        "geo_bypass": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv", "android", "mweb"]
-            }
-        }
-    }
     
     ffmpeg_bin = shutil.which("ffmpeg")
-    if ffmpeg_bin:
-        ydl_opts["ffmpeg_location"] = os.path.dirname(ffmpeg_bin)
+    ffmpeg_dir = os.path.dirname(ffmpeg_bin) if ffmpeg_bin else None
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        raw_filename = ydl.prepare_filename(info)
-    
-    wav_filename = convert_to_wav(raw_filename)
-    if os.path.exists(raw_filename) and raw_filename != wav_filename:
+    configs = [
+        # Strategy 1: iOS & Android client with web fallback
+        {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+            "quiet": True,
+            "nocheckcertificate": True,
+            "geo_bypass": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios", "android", "web"]
+                }
+            }
+        },
+        # Strategy 2: TV client fallback (bypasses bot check)
+        {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+            "quiet": True,
+            "nocheckcertificate": True,
+            "geo_bypass": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv"]
+                }
+            }
+        },
+        # Strategy 3: Standard default with user-agent
+        {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+            "quiet": True,
+            "nocheckcertificate": True,
+            "geo_bypass": True,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            }
+        }
+    ]
+
+    last_error = None
+    for ydl_opts in configs:
+        if ffmpeg_dir:
+            ydl_opts["ffmpeg_location"] = ffmpeg_dir
         try:
-            os.remove(raw_filename)
-        except Exception:
-            pass
-    return wav_filename
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                raw_filename = ydl.prepare_filename(info)
+                wav_filename = convert_to_wav(raw_filename)
+                if os.path.exists(raw_filename) and raw_filename != wav_filename:
+                    try:
+                        os.remove(raw_filename)
+                    except Exception:
+                        pass
+                return wav_filename
+        except Exception as e:
+            last_error = e
+
+    if last_error:
+        raise last_error
 
 
 
