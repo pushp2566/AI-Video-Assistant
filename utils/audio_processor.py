@@ -91,7 +91,7 @@ def download_youtube_audio(url: str) -> str:
 def try_fetch_youtube_captions(url: str) -> str:
     """Fetch text captions directly using youtube-transcript-api without audio download."""
     try:
-        from youtube_transcript_api import YouTubeTranscriptApi
+        import youtube_transcript_api
         import re
 
         video_id = None
@@ -110,42 +110,58 @@ def try_fetch_youtube_captions(url: str) -> str:
         if not video_id:
             return None
 
-        # 1. Try static get_transcript method (older API versions)
-        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
-            try:
-                transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'hi', 'en-GB'])
-                text = " ".join([t['text'] for t in transcript_list if 'text' in t])
-                if text and len(text) > 20:
-                    return text.strip()
-            except Exception:
-                pass
+        def extract_text_from_items(items):
+            parts = []
+            for item in items:
+                if isinstance(item, dict) and 'text' in item:
+                    parts.append(str(item['text']))
+                elif hasattr(item, 'text'):
+                    parts.append(str(getattr(item, 'text')))
+            return " ".join(parts).strip()
 
-        # 2. Try instance method fetch / list (v1.0+ API versions)
-        api = YouTubeTranscriptApi()
-        if hasattr(api, 'fetch'):
-            try:
-                fetched = api.fetch(video_id)
-                text = " ".join([snippet.text for snippet in fetched if hasattr(snippet, 'text')])
+        # Method 1: Try static get_transcript (v0.6.x style)
+        try:
+            if hasattr(youtube_transcript_api.YouTubeTranscriptApi, 'get_transcript'):
+                res = youtube_transcript_api.YouTubeTranscriptApi.get_transcript(video_id)
+                text = extract_text_from_items(res)
                 if text and len(text) > 20:
-                    return text.strip()
-            except Exception:
-                pass
+                    return text
+        except Exception as e:
+            print(f"Method 1 (get_transcript) failed: {e}")
 
-        if hasattr(api, 'list'):
-            try:
-                transcripts = api.list(video_id)
-                # Pick english or first available transcript
-                t_obj = transcripts.find_transcript(['en', 'en-US', 'hi', 'en-GB'])
-                fetched = t_obj.fetch()
-                text = " ".join([snippet.text for snippet in fetched if hasattr(snippet, 'text')])
+        # Method 2: Try static list_transcripts (v0.6.x style)
+        try:
+            if hasattr(youtube_transcript_api.YouTubeTranscriptApi, 'list_transcripts'):
+                tx_list = youtube_transcript_api.YouTubeTranscriptApi.list_transcripts(video_id)
+                for tx in tx_list:
+                    res = tx.fetch()
+                    text = extract_text_from_items(res)
+                    if text and len(text) > 20:
+                        return text
+        except Exception as e:
+            print(f"Method 2 (list_transcripts) failed: {e}")
+
+        # Method 3: Try instance methods fetch / list (v1.x style)
+        try:
+            api = youtube_transcript_api.YouTubeTranscriptApi()
+            if hasattr(api, 'fetch'):
+                res = api.fetch(video_id)
+                text = extract_text_from_items(res)
                 if text and len(text) > 20:
-                    return text.strip()
-            except Exception:
-                pass
+                    return text
+            if hasattr(api, 'list'):
+                tx_list = api.list(video_id)
+                for tx in tx_list:
+                    res = tx.fetch()
+                    text = extract_text_from_items(res)
+                    if text and len(text) > 20:
+                        return text
+        except Exception as e:
+            print(f"Method 3 (instance fetch/list) failed: {e}")
 
         return None
     except Exception as e:
-        print(f"Direct YouTube transcript fetch failed/unavailable: {e}")
+        print(f"Direct YouTube transcript fetch failed: {e}")
         return None
 
 
@@ -189,7 +205,14 @@ def process_input(source: str):
             return direct_transcript
         
         print("Captions not available or failed. Falling back to downloading audio via yt-dlp...")
-        wav_path = download_youtube_audio(source)
+        try:
+            wav_path = download_youtube_audio(source)
+        except Exception as e:
+            if "403" in str(e) or "Forbidden" in str(e):
+                raise RuntimeError(
+                    "YouTube blocked direct video audio download on Streamlit Cloud (403 Forbidden) and no subtitles/captions were found for this video link. Please upload your video or audio file directly using the file uploader in the sidebar!"
+                ) from e
+            raise e
     else:
         if not os.path.exists(source):
             raise FileNotFoundError(
