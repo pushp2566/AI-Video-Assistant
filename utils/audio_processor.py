@@ -13,27 +13,37 @@ def download_youtube_audio(url: str) -> str:
     ffmpeg_bin = shutil.which("ffmpeg")
     ffmpeg_dir = os.path.dirname(ffmpeg_bin) if ffmpeg_bin else None
 
+    # Check if YOUTUBE_COOKIES is provided via environment/secrets
+    cookiefile_path = None
+    cookies_content = os.getenv("YOUTUBE_COOKIES")
+    if cookies_content:
+        cookiefile_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
+        with open(cookiefile_path, "w", encoding="utf-8") as f:
+            f.write(cookies_content)
+
+    base_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": output_path,
+        "quiet": True,
+        "nocheckcertificate": True,
+        "geo_bypass": True,
+    }
+    if cookiefile_path and os.path.exists(cookiefile_path):
+        base_opts["cookiefile"] = cookiefile_path
+
     configs = [
         # Strategy 1: iOS & Android client with web fallback
         {
-            "format": "bestaudio/best",
-            "outtmpl": output_path,
-            "quiet": True,
-            "nocheckcertificate": True,
-            "geo_bypass": True,
+            **base_opts,
             "extractor_args": {
                 "youtube": {
                     "player_client": ["ios", "android", "web"]
                 }
             }
         },
-        # Strategy 2: TV client fallback (bypasses bot check)
+        # Strategy 2: TV client fallback
         {
-            "format": "bestaudio/best",
-            "outtmpl": output_path,
-            "quiet": True,
-            "nocheckcertificate": True,
-            "geo_bypass": True,
+            **base_opts,
             "extractor_args": {
                 "youtube": {
                     "player_client": ["tv"]
@@ -42,11 +52,7 @@ def download_youtube_audio(url: str) -> str:
         },
         # Strategy 3: Standard default with user-agent
         {
-            "format": "bestaudio/best",
-            "outtmpl": output_path,
-            "quiet": True,
-            "nocheckcertificate": True,
-            "geo_bypass": True,
+            **base_opts,
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             }
