@@ -15,7 +15,16 @@ def get_embeddings():
     )
 
 def build_vector_store(transcript : str)->Chroma:
-    print("Building vector Store")
+    print("Building fresh vector Store...")
+
+    # Clear existing vector db if present to prevent cross-video retrieval leakage
+    if os.path.exists(CHROMA_DIR):
+        import shutil
+        try:
+            shutil.rmtree(CHROMA_DIR)
+            print("Cleared previous vector store cache.")
+        except Exception as e:
+            print(f"Warning: Could not remove old vector_db: {e}")
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size = 500,
