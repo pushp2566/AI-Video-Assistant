@@ -15,16 +15,7 @@ def get_embeddings():
     )
 
 def build_vector_store(transcript : str)->Chroma:
-    print("Building fresh vector Store...")
-
-    # Clear existing vector db if present to prevent cross-video retrieval leakage
-    if os.path.exists(CHROMA_DIR):
-        import shutil
-        try:
-            shutil.rmtree(CHROMA_DIR)
-            print("Cleared previous vector store cache.")
-        except Exception as e:
-            print(f"Warning: Could not remove old vector_db: {e}")
+    print("Building fresh in-memory vector Store...")
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size = 500,
@@ -38,11 +29,11 @@ def build_vector_store(transcript : str)->Chroma:
     ]
 
     embeddings = get_embeddings()
+    # In-memory Chroma vector store (no SQLite disk locks, 100% clean & fast)
     vector_store = Chroma.from_documents(
         documents= docs,
         embedding=embeddings,
-        collection_name=COLLECTION_NAME,
-        persist_directory=CHROMA_DIR
+        collection_name=COLLECTION_NAME
     )
 
     return vector_store
