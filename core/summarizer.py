@@ -40,29 +40,44 @@ def split_transcript(transcript: str) -> list:
 def summarize(transcript : str) -> str:
     llm = get_llm()
 
+    # For short transcripts or YouTube Shorts, summarize directly in one clean pass
+    if len(transcript.strip()) < 3000:
+        single_prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
+                "You are an expert meeting and video content summarizer. Provide a clear, "
+                "professional bullet-point summary of the main points from the transcript. "
+                "Do NOT include conversational meta-talk like 'I am ready' or 'Here is a summary'. "
+                "Output ONLY the bullet points directly."
+            ),
+            ("human", "Transcript:\n{text}")
+        ])
+        chain = single_prompt | llm | StrOutputParser()
+        return chain.invoke({"text": transcript.strip()})
+
+    # For longer transcripts, use map-reduce
     map_prompt = ChatPromptTemplate.from_messages(
         [
-        ("system", "Summarize this portion of a meeting transcript concisely."),
+        ("system", "Summarize this portion of a transcript concisely in bullet points."),
         ("human", "{text}"),
     ]
     )
 
     map_chain = map_prompt | llm | StrOutputParser()
-
     chunks = split_transcript(transcript)
-
     chunk_summaries = [map_chain.invoke({"text" : chunk}) for chunk in chunks]
-
     combined = "\n\n".join(chunk_summaries)
 
     combined_prompt = ChatPromptTemplate.from_messages(
         [
         (
             "system",
-            "You are an expert meeting summarizer. Combine these partial summaries "
-            "into one final professional meeting summary in bullet points.",
+            "You are an expert meeting and content summarizer. Combine these partial summaries "
+            "into one comprehensive, professional bullet-point summary. "
+            "Do NOT include conversational filler like 'Here is the summary' or 'I am ready'. "
+            "Output ONLY the final formatted bullet points directly.",
         ),
-        ("human", "{text}"),
+        ("human", "Partial Summaries:\n{text}"),
     ]
     )
 
