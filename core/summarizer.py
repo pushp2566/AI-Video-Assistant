@@ -12,8 +12,9 @@ def get_llm():
         return ChatMistralAI(model="mistral-small-latest", mistral_api_key=os.getenv("MISTRAL_API_KEY"), temperature=0.3)
     elif os.getenv("GROQ_API_KEY"):
         from langchain_groq import ChatGroq
+        model_name = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
         return ChatGroq(
-            model_name="llama3-70b-8192",
+            model_name=model_name,
             groq_api_key=os.getenv("GROQ_API_KEY"),
             temperature=0.3,
         )
