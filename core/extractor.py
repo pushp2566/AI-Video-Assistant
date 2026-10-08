@@ -8,7 +8,10 @@ import os
 
 
 def get_llm():
-    if os.getenv("GROQ_API_KEY"):
+    if os.getenv("MISTRAL_API_KEY"):
+        from langchain_mistralai import ChatMistralAI
+        return ChatMistralAI(model="mistral-small-latest", mistral_api_key=os.getenv("MISTRAL_API_KEY"), temperature=0.2)
+    elif os.getenv("GROQ_API_KEY"):
         from langchain_groq import ChatGroq
         return ChatGroq(
             model_name="llama-3.3-70b-specdec",
@@ -23,8 +26,7 @@ def get_llm():
             base_url=base_url,
             temperature=0.2,
         )
-    from langchain_mistralai import ChatMistralAI
-    return ChatMistralAI(model="mistral-small-latest", mistral_api_key=os.getenv("MISTRAL_API_KEY"), temperature=0.2)
+    raise ValueError("No LLM API key found. Please set MISTRAL_API_KEY or GROQ_API_KEY in environment/secrets.")
 
 
 
