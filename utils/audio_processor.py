@@ -33,28 +33,12 @@ def download_youtube_audio(url: str) -> str:
 
     configs = []
     
-    # If cookies are present, try standard web/mweb first as it is authenticated
+    # 1. Pure authenticated default with cookies
     if cookiefile_path and os.path.exists(cookiefile_path):
-        configs.append({
-            **base_opts,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["web", "mweb"]
-                }
-            }
-        })
+        configs.append(base_opts)
 
     configs.extend([
-        # Strategy 1: iOS & Android client
-        {
-            **base_opts,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["ios", "android"]
-                }
-            }
-        },
-        # Strategy 2: TV client fallback
+        # 2. TV embedded fallback
         {
             **base_opts,
             "extractor_args": {
@@ -63,11 +47,13 @@ def download_youtube_audio(url: str) -> str:
                 }
             }
         },
-        # Strategy 3: Standard default
+        # 3. iOS/Android fallback
         {
             **base_opts,
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios", "android"]
+                }
             }
         }
     ])
