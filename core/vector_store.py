@@ -14,8 +14,12 @@ def get_embeddings():
         model_kwargs = {"device" : 'cpu'}
     )
 
+import uuid
+
 def build_vector_store(transcript : str)->Chroma:
-    print("Building fresh in-memory vector Store...")
+    # Generate unique collection name per analysis to prevent cross-video retrieval leakage
+    unique_collection = f"meeting_{uuid.uuid4().hex[:12]}"
+    print(f"Building isolated vector Store ({unique_collection})...")
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size = 500,
@@ -29,11 +33,11 @@ def build_vector_store(transcript : str)->Chroma:
     ]
 
     embeddings = get_embeddings()
-    # In-memory Chroma vector store (no SQLite disk locks, 100% clean & fast)
+    # In-memory Chroma vector store with isolated collection name
     vector_store = Chroma.from_documents(
         documents= docs,
         embedding=embeddings,
-        collection_name=COLLECTION_NAME
+        collection_name=unique_collection
     )
 
     return vector_store
