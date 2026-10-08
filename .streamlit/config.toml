@@ -1,3 +1,7 @@
 [server]
 maxUploadSize = 200
 maxMessageSize = 200
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = false

@@ -75,6 +75,15 @@ html, body {
     background-color: var(--bg) !important;
 }
 
+/* ── Hide Streamlit Branding / Top Header / Footer / GitHub Links ── */
+#MainMenu { visibility: hidden; display: none !important; }
+footer { visibility: hidden; display: none !important; }
+header { visibility: hidden; display: none !important; }
+[data-testid="stHeader"] { visibility: hidden; display: none !important; }
+[data-testid="stToolbar"] { visibility: hidden; display: none !important; }
+[data-testid="stDecoration"] { visibility: hidden; display: none !important; }
+[data-testid="stStatusWidget"] { visibility: hidden; display: none !important; }
+
 /* Animated grid background */
 .stApp::before {
     content: '';
