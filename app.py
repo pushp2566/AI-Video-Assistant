@@ -500,34 +500,30 @@ if st.session_state.result:
         with st.expander("📝 Full Transcript", expanded=False):
             st.markdown(f'<div class="transcript-box">{r["transcript"]}</div>', unsafe_allow_html=True)
 
-    # Second row: action items | decisions | questions
-    c1, c2, c3 = st.columns(3, gap="medium")
+    # Show extraction cards ONLY if real content was found (hides empty "No items found" cards)
+    has_action = r.get('action_items') and "No action items" not in r.get('action_items')
+    has_decisions = r.get('key_decisions') and "No key decisions" not in r.get('key_decisions')
+    has_questions = r.get('open_questions') and "No open questions" not in r.get('open_questions')
 
-    with c1:
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">✅ Action Items</div>
-            <div class="card-content">{r['action_items']}</div>
-        </div>""", unsafe_allow_html=True)
+    if has_action or has_decisions or has_questions:
+        valid_cards = []
+        if has_action:    valid_cards.append(("✅ Action Items", r['action_items']))
+        if has_decisions: valid_cards.append(("🔑 Key Decisions", r['key_decisions']))
+        if has_questions: valid_cards.append(("❓ Open Questions", r['open_questions']))
 
-    with c2:
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">🔑 Key Decisions</div>
-            <div class="card-content">{r['key_decisions']}</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c3:
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">❓ Open Questions</div>
-            <div class="card-content">{r['open_questions']}</div>
-        </div>""", unsafe_allow_html=True)
+        cols = st.columns(len(valid_cards), gap="medium")
+        for col, (card_title, card_text) in zip(cols, valid_cards):
+            with col:
+                st.markdown(f"""
+                <div class="card">
+                    <div class="card-title">{card_title}</div>
+                    <div class="card-content">{card_text}</div>
+                </div>""", unsafe_allow_html=True)
 
     st.markdown("---")
 
     # ── RAG Chat ──────────────────────────────────────────────────────────────
-    st.markdown('<div style="font-family:\'Syne\',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:1rem">💬 Chat with your Meeting</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-family:\'Syne\',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:1rem">💬 Chat with your Video</div>', unsafe_allow_html=True)
 
     # Chat history display
     if st.session_state.chat_history:
@@ -551,7 +547,7 @@ if st.session_state.result:
         st.markdown("""
         <div class="card" style="text-align:center;padding:2rem">
             <div style="font-size:2rem;margin-bottom:0.5rem">💬</div>
-            <div style="color:var(--text-muted);font-size:0.85rem">Ask anything about your meeting transcript</div>
+            <div style="color:var(--text-muted);font-size:0.85rem">Ask anything about your video transcript or content</div>
         </div>""", unsafe_allow_html=True)
 
     # Chat input
