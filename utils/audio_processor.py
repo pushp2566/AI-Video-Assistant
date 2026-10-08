@@ -110,10 +110,40 @@ def try_fetch_youtube_captions(url: str) -> str:
         if not video_id:
             return None
 
-        # Fetch transcript in available languages (English, Hindi, auto-generated)
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'hi', 'en-GB'])
-        text = " ".join([t['text'] for t in transcript_list if 'text' in t])
-        return text.strip()
+        # 1. Try static get_transcript method (older API versions)
+        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
+            try:
+                transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'hi', 'en-GB'])
+                text = " ".join([t['text'] for t in transcript_list if 'text' in t])
+                if text and len(text) > 20:
+                    return text.strip()
+            except Exception:
+                pass
+
+        # 2. Try instance method fetch / list (v1.0+ API versions)
+        api = YouTubeTranscriptApi()
+        if hasattr(api, 'fetch'):
+            try:
+                fetched = api.fetch(video_id)
+                text = " ".join([snippet.text for snippet in fetched if hasattr(snippet, 'text')])
+                if text and len(text) > 20:
+                    return text.strip()
+            except Exception:
+                pass
+
+        if hasattr(api, 'list'):
+            try:
+                transcripts = api.list(video_id)
+                # Pick english or first available transcript
+                t_obj = transcripts.find_transcript(['en', 'en-US', 'hi', 'en-GB'])
+                fetched = t_obj.fetch()
+                text = " ".join([snippet.text for snippet in fetched if hasattr(snippet, 'text')])
+                if text and len(text) > 20:
+                    return text.strip()
+            except Exception:
+                pass
+
+        return None
     except Exception as e:
         print(f"Direct YouTube transcript fetch failed/unavailable: {e}")
         return None
