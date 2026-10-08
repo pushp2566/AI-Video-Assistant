@@ -88,6 +88,36 @@ def download_youtube_audio(url: str) -> str:
         raise last_error
 
 
+def try_fetch_youtube_captions(url: str) -> str:
+    """Fetch text captions directly using youtube-transcript-api without audio download."""
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        import re
+
+        video_id = None
+        # Extract YouTube Video ID
+        patterns = [
+            r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+            r'youtu\.be\/([0-9A-Za-z_-]{11})',
+            r'shorts\/([0-9A-Za-z_-]{11})'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                video_id = match.group(1)
+                break
+
+        if not video_id:
+            return None
+
+        # Fetch transcript in available languages (English, Hindi, auto-generated)
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'hi', 'en-GB'])
+        text = " ".join([t['text'] for t in transcript_list if 'text' in t])
+        return text.strip()
+    except Exception as e:
+        print(f"Direct YouTube transcript fetch failed/unavailable: {e}")
+        return None
+
 
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
@@ -114,10 +144,21 @@ def chunk_audio(wav_path : str , chunk_minutes : int = 10) -> list:
     
     return chunks
 
-def process_input(source: str) -> list:
+def process_input(source: str):
+    """
+    Returns:
+    - str: Direct transcript text if fetched via YouTube Transcript API (no Whisper needed)
+    - list[str]: List of WAV chunk filepaths for Whisper processing (for uploaded files or YT fallbacks)
+    """
     source = source.strip()
     if source.startswith("http://") or source.startswith("https://"):
-        print("Detected YouTube URL. Downloading audio...")
+        print("Detected YouTube URL. Attempting direct transcript fetch via YouTube Transcript API...")
+        direct_transcript = try_fetch_youtube_captions(source)
+        if direct_transcript and len(direct_transcript) > 20:
+            print("Successfully retrieved YouTube captions directly! Skipping audio download.")
+            return direct_transcript
+        
+        print("Captions not available or failed. Falling back to downloading audio via yt-dlp...")
         wav_path = download_youtube_audio(source)
     else:
         if not os.path.exists(source):

@@ -103,7 +103,11 @@ def transcribe_chunk(chunk_path: str, language: str = "english") -> str:
     return transcribe_chunk_whisper(chunk_path)
 
 
-def transcribe_all(chunks: list, language: str = "english") -> str:
+def transcribe_all(chunks, language: str = "english") -> str:
+    # If chunks is already a string (direct YouTube transcript fetched), return it!
+    if isinstance(chunks, str):
+        print("Transcript fetched directly from YouTube Captions API. Skipping audio transcription.")
+        return chunks
 
     full_transcript = "" 
 
