@@ -119,17 +119,44 @@ def try_fetch_youtube_captions(url: str) -> str:
                     parts.append(str(getattr(item, 'text')))
             return " ".join(parts).strip()
 
-        # Method 1: Try static get_transcript (v0.6.x style)
+        # 1. Instance method list() (v1.x style - handles auto-generated captions)
+        try:
+            api = youtube_transcript_api.YouTubeTranscriptApi()
+            if hasattr(api, 'list'):
+                tx_list = api.list(video_id)
+                for tx in tx_list:
+                    res = tx.fetch()
+                    text = extract_text_from_items(res)
+                    if text and len(text) > 20:
+                        print(f"Successfully retrieved captions using api.list() ({tx.language_code})")
+                        return text
+        except Exception as e:
+            print(f"Caption fetch attempt (api.list) failed: {e}")
+
+        # 2. Instance method fetch() (v1.x style)
+        try:
+            api = youtube_transcript_api.YouTubeTranscriptApi()
+            if hasattr(api, 'fetch'):
+                res = api.fetch(video_id)
+                text = extract_text_from_items(res)
+                if text and len(text) > 20:
+                    print("Successfully retrieved captions using api.fetch()")
+                    return text
+        except Exception as e:
+            print(f"Caption fetch attempt (api.fetch) failed: {e}")
+
+        # 3. Static get_transcript (v0.6.x style)
         try:
             if hasattr(youtube_transcript_api.YouTubeTranscriptApi, 'get_transcript'):
                 res = youtube_transcript_api.YouTubeTranscriptApi.get_transcript(video_id)
                 text = extract_text_from_items(res)
                 if text and len(text) > 20:
+                    print("Successfully retrieved captions using get_transcript()")
                     return text
         except Exception as e:
-            print(f"Method 1 (get_transcript) failed: {e}")
+            print(f"Caption fetch attempt (get_transcript) failed: {e}")
 
-        # Method 2: Try static list_transcripts (v0.6.x style)
+        # 4. Static list_transcripts (v0.6.x style)
         try:
             if hasattr(youtube_transcript_api.YouTubeTranscriptApi, 'list_transcripts'):
                 tx_list = youtube_transcript_api.YouTubeTranscriptApi.list_transcripts(video_id)
@@ -137,27 +164,10 @@ def try_fetch_youtube_captions(url: str) -> str:
                     res = tx.fetch()
                     text = extract_text_from_items(res)
                     if text and len(text) > 20:
+                        print("Successfully retrieved captions using list_transcripts()")
                         return text
         except Exception as e:
-            print(f"Method 2 (list_transcripts) failed: {e}")
-
-        # Method 3: Try instance methods fetch / list (v1.x style)
-        try:
-            api = youtube_transcript_api.YouTubeTranscriptApi()
-            if hasattr(api, 'fetch'):
-                res = api.fetch(video_id)
-                text = extract_text_from_items(res)
-                if text and len(text) > 20:
-                    return text
-            if hasattr(api, 'list'):
-                tx_list = api.list(video_id)
-                for tx in tx_list:
-                    res = tx.fetch()
-                    text = extract_text_from_items(res)
-                    if text and len(text) > 20:
-                        return text
-        except Exception as e:
-            print(f"Method 3 (instance fetch/list) failed: {e}")
+            print(f"Caption fetch attempt (list_transcripts) failed: {e}")
 
         return None
     except Exception as e:
