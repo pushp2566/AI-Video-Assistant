@@ -362,7 +362,8 @@ with st.sidebar:
     st.markdown("---")
 
     st.markdown('<span class="badge badge-purple">Input</span>', unsafe_allow_html=True)
-    source = st.text_input("YouTube URL or File Path", placeholder="https://youtube.com/watch?v=... or /path/to/file.mp4")
+    uploaded_file = st.file_uploader("Upload Audio/Video File", type=["mp4", "mp3", "wav", "m4a", "webm", "mkv"])
+    source_url = st.text_input("Or Enter YouTube URL / Path", placeholder="https://youtube.com/watch?v=...")
 
     language = st.selectbox("Language", ["english", "hinglish"], index=0)
 
@@ -388,13 +389,23 @@ st.markdown("---")
 
 # ── Run Pipeline ────────────────────────────────────────────────────────────────
 if run_btn:
-    if not source.strip():
-        st.error("Please enter a YouTube URL or file path.")
+    if not uploaded_file and not source_url.strip():
+        st.error("Please upload an audio/video file or enter a YouTube URL.")
     else:
         st.session_state.pipeline_done = False
         st.session_state.result = None
         st.session_state.chat_history = []
         st.session_state.pipeline_steps = {}
+
+        # Save uploaded file to temporary download dir if provided
+        if uploaded_file is not None:
+            save_dir = os.path.join(os.path.dirname(__file__), "downloades")
+            os.makedirs(save_dir, exist_ok=True)
+            source = os.path.join(save_dir, uploaded_file.name)
+            with open(source, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+        else:
+            source = source_url.strip().strip('"').strip("'")
 
         progress_placeholder = st.empty()
 
