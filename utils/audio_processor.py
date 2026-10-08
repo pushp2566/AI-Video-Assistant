@@ -17,7 +17,7 @@ def download_youtube_audio(url :str) ->str:
         "geo_bypass": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv_embedded", "android", "ios", "mweb"]
+                "player_client": ["tv", "android", "mweb"]
             }
         }
     }
