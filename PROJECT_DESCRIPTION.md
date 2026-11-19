@@ -1,218 +1,185 @@
-# 🎬 AI Video Assistant - Complete Technical Guide & Beginner-Friendly Interview File
+# AI Video Assistant — Project Description and Interview Guide
 
-> **Author:** Pushpendra Choure  
-> **Project:** AI Video Intelligence & RAG Assistant  
-> **Repository:** [pushp2566/AI-Video-Assistant](https://github.com/pushp2566/AI-Video-Assistant)  
-> **Live Demo:** [AI Video Assistant App](https://ai-video-assistant-dazevw4wymcq5f6nd2735a.streamlit.app/)  
-> **Tech Stack:** Python, Streamlit, LangChain, Groq API (GPT-OSS-20B), Mistral AI, OpenAI Whisper, Sarvam AI, RapidAPI, ChromaDB, HuggingFace Embeddings, PyTorch, pydub, FFmpeg, yt-dlp
+**Pushpendra Choure** · Python, Streamlit, LangChain, Whisper, Sarvam AI, ChromaDB, Hugging Face embeddings  
+[GitHub repository](https://github.com/pushp2566/AI-Video-Assistant) · [Live demo on Streamlit Cloud](https://ai-video-assistant-dazevw4wymcq5f6nd2735a.streamlit.app/)
 
----
+## How to study from this file
 
-## 📌 Section 1: Executive Summary & 30-Second Elevator Pitch
+Copy this prompt after attaching the guide in a new chat.
 
-### 🎤 30-Second Elevator Pitch (For Interviewers)
-> *"I built **AI Video Assistant**, a full-stack AI video intelligence platform deployed on Streamlit Cloud that converts YouTube links or local video/audio uploads into structured summaries, key takeaways, and an interactive RAG chat interface.
->
-> To bypass cloud datacenter IP blocks (HTTP 403), I engineered a multi-tiered ingestion pipeline combining **`youtube-transcript-api`**, **RapidAPI residential proxies**, and **`yt-dlp`**. For audio, it leverages **OpenAI Whisper** and **Sarvam AI** for multilingual transcription (English & Hinglish), **Groq LLM (GPT-OSS-20B)** via **LangChain** for smart single-pass and Map-Reduce summarization, and an **in-memory ChromaDB** vector store with **UUID-tagged collections** to guarantee zero cross-video data leakage."*
+> Use the attached guide to teach me my AI Video Assistant project for an SDE interview. Assume I know basic programming. Define AI terms before using them. Teach one lesson at a time and wait for my “Next.” Start with what the user enters and sees. Then cover input routing, speech-to-text, LLM summaries and extractions, RAG indexing and retrieval, Streamlit session state, deployment, and testing. Trace the same sample through the whole pipeline, show the relevant file and function names, and end every lesson with two interview questions. Use the guide’s verified results and limitations when discussing résumé claims. Label illustrative examples and proposed improvements.
 
----
+| Lesson | What you should be able to explain |
+| --- | --- |
+| 1. App overview | Why the app exists, who uses it, what goes in and what comes out. |
+| 2. Ingestion and transcription | Where YouTube captions come from, when audio is downloaded, and how Whisper and Sarvam are selected. |
+| 3. LLM generation | What a prompt is, how the model is selected, and why long summaries use map-reduce. |
+| 4. RAG | How the transcript is indexed once and how each question retrieves and uses relevant passages. |
+| 5. App runtime | Why Streamlit reruns, what stays in session state, what a new analysis resets, and how local execution differs from hosting. |
+| 6. Interview practice | Explain the code, then defend each résumé bullet and discuss verification, failure cases, and improvements. |
 
-## 🏗️ Section 2: End-to-End System Architecture & Data Flow
+## 30-second interview pitch
 
+I built and deployed a Streamlit app that turns YouTube links and uploaded recordings into searchable transcripts. It can reuse YouTube captions or transcribe audio using local Whisper for the English path and Sarvam for Hinglish speech-to-English translation. LangChain generates a title, a summary, and meeting insights. The chat feature retrieves relevant chunks from a ChromaDB collection created for the current analysis and passes those chunks to an LLM to answer the question.
+
+## Résumé bullets
+
+- Built and deployed an app on **Streamlit Cloud** that turns YouTube videos and uploaded recordings into transcripts, summaries, and interactive Q&A.
+- Implemented a **caption-first YouTube pipeline** using a RapidAPI transcript endpoint and `youtube-transcript-api`, with **yt-dlp** as an audio fallback and **FFmpeg** for preprocessing.
+- Integrated **Whisper** for English audio and **Sarvam AI** for Hinglish-to-English transcription. Used **LangChain** to generate titles, summarize long transcripts in stages, and extract action items, key decisions, and open questions.
+- Built **transcript-grounded RAG** with **all-MiniLM-L6-v2** embeddings and **in-memory ChromaDB**, retrieving up to four relevant passages from a separate collection for each analysis.
+
+## What was verified
+
+| Check | Observed result |
+| --- | --- |
+| Streamlit Cloud deployment | The public demo was asleep initially and loaded after waking. |
+| Hosted YouTube analysis | The [repository’s sample video](https://www.youtube.com/watch?v=_Q-e_nczWqM) produced a transcript, title, summary, key decisions, and open questions. Results were visible about two minutes after clicking **Analyse**, with the app already awake. |
+| Hosted transcript Q&A | Asked what billing model GitHub Copilot switched to. The app answered **token-based billing**, consistent with the transcript. The answer was visible within 17 seconds of submission. |
+| Local audio preprocessing | A three-second MP3 was converted to 16 kHz mono WAV. A 601-second WAV was split into chunks of 600 seconds and one second. |
+| Remaining verification | Hosted audio uploads through Whisper or Sarvam and the active hosted LLM provider remain unverified. The YouTube run did not establish which caption or audio path it took. |
+
+The timings are observations from one sample. They describe time to visible output and provide no separate measurements for caption extraction or model inference. Use the deployment claim on the résumé. Typical latency and reliability would require repeated measurements across inputs. The code supports Groq with `openai/gpt-oss-20b` as its default when selected. Name the deployed model only after checking the hosting configuration.
+
+## System flow
+
+1. **Input.** In `app.py`, the user uploads media or enters a URL or server-side file path, selects English or Hinglish, and clicks **Analyse**. An upload takes precedence. The uploader accepts `.mp4`, `.mp3`, `.wav`, `.m4a`, `.webm`, and `.mkv`. A typed local path is resolved by the process running Streamlit. A hosted app cannot read a path on the visitor’s laptop.
+2. **Get transcript or audio.** `process_input()` returns either a caption string or a list of paths to WAV chunks. Captions take the fast path because they bypass downloading, audio conversion and speech-to-text.
+3. **Build the transcript.** `transcribe_all()` returns an existing caption string unchanged. For WAV chunks, it calls the selected speech-to-text engine in order and joins the text.
+4. **Generate insights.** LangChain calls the configured LLM to generate a title, summarize the transcript, and extract action items, key decisions/main takeaways, and open questions.
+5. **Index the transcript.** The app chunks and embeds the original transcript, creates a fresh in-memory Chroma collection, and builds a retriever for it.
+6. **Serve results and Q&A.** Streamlit stores the result and RAG chain in the current session. Each question retrieves transcript chunks and makes a fresh LLM call.
+
+### Architecture at a glance
+
+```mermaid
+flowchart TD
+    A["Streamlit UI or terminal CLI"] --> B["Resolve URL or file"]
+    B --> C{"Usable YouTube captions?"}
+    C -->|Yes| F["Transcript text"]
+    C -->|No, or file input| D["Decode and split audio"]
+    D --> E["Whisper or Sarvam"]
+    E --> F
+    F --> G["Title, summary and insights"]
+    F --> H["Embed and index transcript chunks"]
+    H --> I["Retrieve context for each question"]
+    I --> J["LLM generates answer"]
 ```
-┌────────────────────────────────┐       ┌───────────────────────────────────────┐
-│          Input Source          │       │        Multi-Tiered Ingestion          │
-│ (YouTube URL / Video File Upload)  ──> │ (Captions API / RapidAPI / yt-dlp)    │
-└────────────────────────────────┘       └───────────────────────────────────────┘
-                                                             │
-                                                             ▼
-┌────────────────────────────────┐       ┌───────────────────────────────────────┐
-│     Multilingual Speech STT    │       │         Audio Preprocessing           │
-│   (Whisper / Sarvam AI API)    │ <───  │    (FFmpeg 16kHz Mono WAV Slicing)    │
-└────────────────────────────────┘       └───────────────────────────────────────┘
-                │
-                ▼
-┌────────────────────────────────┐       ┌───────────────────────────────────────┐
-│     Full Text Transcript       │ ───>  │        RAG Chat Engine (ChromaDB)     │
-│  (Direct / Speech Transcribed) │       │ (In-Memory UUID + HuggingFace Vector) │
-└────────────────────────────────┘       └───────────────────────────────────────┘
-                │                                            │
-                ▼                                            ▼
-┌────────────────────────────────┐       ┌───────────────────────────────────────┐
-│      LLM Pipeline (Groq)       │       │    Interactive Streamlit Web App      │
-│  (Title, Summary, Takeaways)   │ ───>  │     (Dark Mode UI, No Data Leakage)   │
-└────────────────────────────────┘       └───────────────────────────────────────┘
+
+The two branches from the transcript show how the data is used. The current implementation generates the title, summary, and insights first, then builds the RAG index.
+
+### Pipeline in pseudocode
+
+```text
+ON ANALYSE(source, language)
+  raw = process_input(source)                   # caption text OR WAV paths
+  transcript = transcribe_all(raw, language)   # existing captions pass through
+  title = generate_title(transcript)
+  summary = summarize(transcript)
+  action_items = extract_action_items(transcript)
+  key_decisions = extract_key_decisions(transcript)
+  open_questions = extract_questions(transcript)
+  rag_chain = build_rag_chain(transcript)
+  keep the transcript, generated outputs, and chain for the active analysis
+
+ON SEND(question)
+  context = retrieve up to four passages from the active transcript index
+  answer = generate from the question and context
+  append the question and answer to the displayed chat history
 ```
 
-### Step-by-Step Data Flow:
-1. **Multi-Tiered Video Ingestion (`utils/audio_processor.py`)**:
-   - **Tier 1 (Instant Caption Fetch)**: Uses `youtube-transcript-api` (supporting multi-version fallbacks for `list()` & `fetch()`) to retrieve captions without downloading audio.
-   - **Tier 2 (Cloud IP Block Bypass)**: Routes queries through **RapidAPI residential proxy service** (`youtube-transcript3`) to guarantee 100% block-free fetching on Streamlit Cloud (bypassing AWS 403 Forbidden blocks).
-   - **Tier 3 (yt-dlp Fallback)**: Downloads raw audio streams using `yt-dlp` with client player fallbacks.
-   - **Tier 4 (Direct File Upload)**: Supports direct drag-and-drop uploader for `.mp4`, `.mp3`, `.wav`, `.m4a`, `.webm`, `.mkv` files.
+The web app keeps the result and chat history in `st.session_state`, a per-session place to keep data across UI reruns. The CLI holds its result in memory while the terminal program is open. A new web analysis clears the previous visible result and chat before processing. During analysis, an exception can stop the sequence before a result is saved and is shown in the UI.
 
-2. **Multilingual Speech-to-Text (`core/transcriber.py`)**:
-   - **English Option**: Runs local **OpenAI Whisper** (`tiny` / `small` model) on CPU/GPU.
-   - **Hinglish / Hindi Option**: Slices audio into 25-second WAV segments and sends them to **Sarvam AI STT API** (`saaras:v2.5`) which transcribes and translates Hinglish speech directly to English text.
+## Ingestion and speech-to-text
 
-3. **LLM Summarization & Structured Extraction (`core/summarizer.py` & `core/extractor.py`)**:
-   - Uses **Groq LLM** (`openai/gpt-oss-20b`) via **LangChain LCEL** (with fallbacks to **Mistral AI** or **Ollama**).
-   - **Smart Adaptive Summarization**:
-     - **Short Transcripts (<3,000 chars / Shorts)**: Direct single-pass prompt to eliminate conversational LLM meta-talk ("I am ready to combine...").
-     - **Long Transcripts**: Map-Reduce summarization strategy (splits into 3,000-char chunks, summarizes each, and merges into final bullet points).
-   - **Structured Intelligence**: Extracts Title, Key Takeaways, Action Items, Decisions, and Open Questions.
-   - **Dynamic Card Rendering**: UI automatically hides empty "No items found" cards to keep the layout clean.
+| Step | What the code does | Interview follow-up |
+| --- | --- | --- |
+| YouTube ID and captions | Extracts an 11-character video ID with regex. Tries the `youtube-transcript3` RapidAPI endpoint first when a key is configured (12-second request timeout). Then tries `youtube-transcript-api` instance `list()`, instance `fetch()`, and older static methods when available. Accepts returned text longer than 20 characters. | The app integrates a hosted transcript endpoint. Its provider’s underlying proxy infrastructure is unverified. Caption text is flattened, so segment timestamps are discarded. The caption path has no language matching or translation step tied to the UI picker. |
+| Audio fallback | If caption retrieval fails, `yt-dlp` attempts an audio/media download using several client configurations. A download exception containing `403` or `Forbidden` produces an upload suggestion. | Upload is a separate input option the user must choose. Caption access and downloads can still fail. |
+| WAV preprocessing | `pydub` and FFmpeg decode media and export 16 kHz mono WAV. The app then makes non-overlapping WAV chunks of up to 10 minutes. | This creates a consistent audio format. The process loads the audio into memory, so file size and duration matter. Fixed cuts can split speech mid-sentence. |
+| English audio | Loads the open-source Whisper model locally on the app host, lazily stores it in a module-level variable, and calls `transcribe(..., task="transcribe")`. The default model size is `small`. | “English” selects the Whisper route. The code leaves Whisper’s language autodetection in place. Whisper produces text from speech and requires no hosted Whisper API. |
+| Hinglish audio | Further slices each WAV chunk into 25-second pieces and sends them sequentially to Sarvam’s speech-to-text-translate API, default model `saaras:v2.5`. The short pieces give a margin under the synchronous limit assumed by the code. Joins the translated English text and removes each piece file in a `finally` block. | Treat 25 seconds as the app’s setting. The app does not perform speaker diarization, meaning it does not identify who spoke each line. |
 
-4. **In-Memory UUID Vector Store & RAG Engine (`core/vector_store.py` & `core/rag_engine.py`)**:
-   - Splits transcript into 500-character chunks (overlap: 50) via `RecursiveCharacterTextSplitter`.
-   - Generates 384-dimensional vector embeddings using HuggingFace's `all-MiniLM-L6-v2`.
-   - **Data Isolation & Lock-Free Storage**: Stores vectors in **In-Memory ChromaDB** using **unique UUID collection tags** (`video_a1b2c3d4...`). This completely prevents SQLite disk lock errors (`code 1032`) and guarantees 0% cross-video data leakage.
-   - **RAG Q&A**: Connects retriever (`k=4`) with strict context grounding prompts to answer user questions without hallucination.
+## LLM generation and summarization
 
-5. **Web Dashboard (`app.py`)**:
-   - Built on **Streamlit** with custom dark-mode CSS styling.
-   - Stripped away default Streamlit branding, top headers, and footers for a clean, standalone user experience.
+- **Provider selection** in `core/summarizer.py`, `core/extractor.py` and `core/rag_engine.py` checks for `MISTRAL_API_KEY` first (`mistral-small-latest`), then `GROQ_API_KEY` (default `openai/gpt-oss-20b`, overridable with `GROQ_MODEL`), then `OLLAMA_MODEL`. This is configuration priority. An API error does not trigger automatic provider failover. Leave the Mistral key unset to select Groq. Use actual values for configured providers and leave unused example placeholders unset.
+- **LangChain Expression Language (LCEL)** uses `|` to connect a prompt, a chat model, and `StrOutputParser`. The parser returns text. The project calls pretrained models without training or fine-tuning them.
+- **Title** uses the first 2,000 characters and asks for at most eight words. The limit is a prompt instruction.
+- **Summary** uses a single call when the stripped transcript is under 3,000 characters. At 3,000 characters or above, it splits at 3,000 characters with 200-character overlap, summarizes each chunk sequentially (map), then combines the partial summaries in one call (reduce). Chunk sizes are in characters. The reduce input can still grow long.
+- **Meeting insights** use three separate prompts on the full transcript. They request action items with task, owner and deadline, key decisions or main takeaways, and unresolved questions. The outputs are numbered text lists, and UI cards are hidden using checks for the matching “No … found” phrases. The extractor has no JSON schema, token-budgeting step or validated owner/deadline fields.
+- **Call count** before chat is typically five LLM generations on the short-transcript path (title + summary + three extractions), or `N + 5` for `N` map chunks (title + N maps + reduce + three extractions). Each chat turn adds one generation. Speech-to-text requests and embedding computation are separate.
 
----
+## RAG from first principles
 
-## 📘 Section 3: Beginner-Friendly Glossary & Plain-English Term Explanations
+**Retrieval-Augmented Generation (RAG)** means retrieving relevant source text before asking a language model to answer. An **embedding** is a vector representing a piece of text. Nearby vectors can capture related meanings even when the words differ.
 
-### 1. In-Memory Vector Store & UUID Isolation
-- **Simple Analogy (Private Hotel Rooms vs. One Shared Locker)**:
-  - *Old Way*: Throwing every customer's luggage into one big shared locker. When Customer B looks for their bag, they accidentally grab Customer A's jacket.
-  - *New Way (UUID Isolation)*: Assigning each customer a brand-new, private, temporary room key (`video_uuid123`). When they check out, the room is wiped clean.
-- **Technical Meaning**: Using ChromaDB in memory (RAM) with uniquely generated collection names (`video_a1b2c3d4...`).
-- **In This Project**: Solved cross-video transcript leakage and eliminated SQLite file permission errors (`code 1032 readonly database`).
+| Stage | Actual implementation |
+| --- | --- |
+| Split | `RecursiveCharacterTextSplitter` makes transcript chunks with a target size of 500 characters and 50-character overlap. Each `Document` has `page_content` and a `chunk_index`. The overlap helps retain information at boundaries. |
+| Embed and store | Hugging Face `all-MiniLM-L6-v2` creates 384-dimensional embeddings on CPU. `Chroma.from_documents()` stores chunks and vectors in a non-persistent collection named `video_` plus 12 hex characters from a UUID. [Embedding model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) |
+| Retrieve | The same embedding model represents the question. Chroma similarity search returns up to four chunks (`k=4`) from the current collection. The code does not select an explicit distance metric, score cutoff, reranker, or hybrid keyword search. |
+| Generate | The LCEL chain passes the question through, joins retrieved `page_content` with blank lines, and inserts it in the system prompt. The prompt asks the model to answer from the context and say when it cannot find the information. The UI displays text answers without citations or timestamps. |
 
----
+## One example through the entire app
 
-### 2. Multi-Tiered Ingestion & Proxy Bypassing
-- **Simple Analogy**: If the front door (direct download) is locked by security (YouTube 403 Forbidden), you use the side VIP pass (RapidAPI proxy) to walk right in without waiting.
-- **Technical Meaning**: Routing requests through residential proxies and caption APIs to prevent datacenter IP blocks.
-- **In This Project**: Ensures YouTube video links work 100% reliably on Streamlit Cloud servers.
+Suppose you upload a short English meeting recording as `team-meeting.mp3`. It contains this speech.
 
----
+> Priya will prepare the slides by Friday. We decided to use a blue cover. We still need to decide who will present on Monday.
 
-### 3. RAG (Retrieval-Augmented Generation)
-- **Simple Analogy (Open-Book Exam)**: 
-  - *Without RAG (Closed-Book)*: Asking an AI a question about your video. The AI tries to guess or lies (hallucinates) because it never watched your video.
-  - *With RAG (Open-Book)*: The system searches the video transcript, finds the exact 2-3 paragraphs containing the answer, pastes them into the AI prompt, and tells the AI: *"Answer based strictly on these paragraphs."*
-- **Technical Meaning**: An architecture combining information retrieval (vector DB search) with generative LLM prompts.
+1. **Ingestion and speech-to-text.** The uploaded MP3 is saved on the app host. FFmpeg and pydub turn its audio into a mono WAV, and `chunk_audio()` writes one WAV chunk for this short recording. Whisper reads that chunk and supplies the transcript text. With a YouTube link and usable captions, the same downstream stages could start directly from the caption text.
+2. **Title, summary, and insights.** The transcript fits under 3,000 characters, so the summary takes one LLM call. Possible outputs are the title “Slide Planning Meeting,” a summary about the slides and presentation, the action item “Prepare slides | Priya | Friday,” the decision “Use a blue cover,” and the open question “Who will present on Monday?” These are illustrative outputs. The real app asks for text lists, and an LLM can phrase them differently.
+3. **Indexing.** The short transcript can fit in one 500-character retrieval chunk. The embedding model converts that text into a vector of 384 numbers. Chroma associates the vector with the source text and its chunk index. A longer transcript produces multiple vectors.
+4. **Asking a question.** For “When is the deck due?”, the same embedding model converts the question into a vector. Similarity search can connect “deck due” with “slides by Friday.” Chroma returns the relevant source text. The LLM reads it together with the question and can answer “Friday.”
+5. **Asking outside the source.** For “What is the project budget?”, the prompt asks the model to say it cannot find the answer in the transcript. For “Who’s doing it?”, the retrieved text might contain the answer, but the model receives no earlier question or answer to clarify what “it” refers to.
 
----
+**Each component has a different role.** Whisper or Sarvam turns speech into words. The embedding model converts text to numbers for similarity search. Chroma stores and retrieves the relevant text. The LLM writes titles, summaries, insights, and answers. LangChain connects prompts, models, retrieval, and output parsing. Streamlit handles the interface and session state.
 
-### 4. Embeddings (Vector Embeddings)
-- **Simple Analogy**: Giving every sentence a unique GPS coordinate based on its meaning. Sentences with similar meanings get placed right next to each other on the map.
-- **Technical Meaning**: Converting text into high-dimensional numerical arrays (384 dimensions via `all-MiniLM-L6-v2`).
+## Code map and runtime
 
----
+| File | What to explain |
+| --- | --- |
+| `app.py` | Streamlit UI, lazy pipeline imports, synchronous analysis, error display, results and session state. Streamlit reruns the script on interaction. `st.session_state` retains results, pipeline flags/status and displayed chat history across reruns. A new analysis clears the displayed result and chat. |
+| `main.py` | CLI version. `run_pipeline()` orchestrates the same core stages, then a terminal loop asks questions using the returned chain. |
+| `utils/audio_processor.py` | `process_input`, `try_fetch_youtube_captions`, `download_youtube_audio`, `convert_to_wav`, `chunk_audio`. |
+| `core/transcriber.py` | `transcribe_all` handles captions or WAV paths. `transcribe_chunk` chooses Whisper or Sarvam. |
+| `core/summarizer.py` and `core/extractor.py` | Title, single-pass/map-reduce summary, and three meeting insight prompts. Each module implements its own provider selection. |
+| `core/vector_store.py` and `core/rag_engine.py` | `build_vector_store`, `get_retriever`, `build_rag_chain`, `ask_question`. The legacy persistent loader is outside the normal web/CLI path. Its companion `load_rag_chain()` currently calls `get_retriever()` without the required store argument. |
+| `test.py`, `requirements.txt`, `packages.txt`, `.streamlit/config.toml` | `test.py` is a manual YouTube smoke script for transcription and insights. Dependencies are mostly minimum versions. `packages.txt` lists FFmpeg for hosting. Streamlit is configured for a 200 MB per-file upload limit. |
 
-### 5. Single-Pass vs. Map-Reduce Summarization
-- **Simple Analogy**: Reading a 1-page essay in one quick glance (**Single-Pass**) vs. assigning 5 people to summarize 5 different chapters of a long book and combining their notes (**Map-Reduce**).
-- **Technical Meaning**: Adaptive summarization logic chosen based on transcript character length.
+To run locally, use a compatible Python environment, install `requirements.txt` and the FFmpeg binary, and set configuration through `.env` or the appropriate environment/secrets settings on the host. Launch with `streamlit run app.py` or `python main.py`. The full app needs a configured LLM. Hosted LLMs receive transcript content or retrieved excerpts, and Sarvam receives audio on the Hinglish path. Local Whisper transcription can run on the host after its model weights are available.
 
----
+### Configuration and data flow
 
-## 💻 Section 4: Codebase Module Deep Dive
+| Setting | Purpose in the project |
+| --- | --- |
+| `MISTRAL_API_KEY`, `GROQ_API_KEY`, `GROQ_MODEL` | Configure a hosted chat model. Mistral takes priority when both keys exist. Groq’s default model is `openai/gpt-oss-20b` when Groq is selected. |
+| `OLLAMA_MODEL`, `OLLAMA_BASE_URL` | Select an Ollama model when the two hosted keys are unset. The default URL points at the app host’s own port 11434, so a hosted Streamlit process cannot use Ollama running on your laptop through localhost. |
+| `RAPIDAPI_KEY`, `YOUTUBE_COOKIES` | Optional inputs used by different YouTube paths. The key enables the first caption endpoint. Cookie configuration is used by the audio download path. |
+| `WHISPER_MODEL`, `SARVAM_API_KEY`, `SARVAM_STT_MODEL` | Choose the local Whisper size, enable the Hinglish audio route, or override its default Sarvam model. Sarvam’s audio requests use a 120-second request timeout in this code. |
 
-### 1. `app.py` (Streamlit Interface)
-- **Role**: Renders the frontend dark-theme UI.
-- **Key Features**: Hides Streamlit default branding/headers, dynamically renders active insight cards, manages session state, and executes the processing pipeline.
+Caption sources handle the YouTube request. The app host handles uploaded media, local Whisper inference, and embedding computation. The chosen chat provider receives whatever text each prompt uses. On the Hinglish audio route, Sarvam receives WAV slices. In-memory vector indexing does not imply that uploads, generated WAVs, or application logs are erased. The code cleans up Sarvam’s individual slice files and attempts to remove the original downloaded media after conversion. Other media files can remain in the shared working directory.
 
-### 2. `utils/audio_processor.py` (Multi-Tiered Ingestion)
-- **Role**: Handles media acquisition, caption extraction, proxy fallbacks, and audio resampling.
-- **Key Functions**:
-  - `fetch_rapidapi_youtube_transcript(video_id)`: Fetches captions via RapidAPI proxy service.
-  - `try_fetch_youtube_captions(url)`: Multiversion fallback for `youtube-transcript-api`.
-  - `download_youtube_audio(url)`: `yt-dlp` download fallback.
-  - `convert_to_wav(input_path)`: Resamples audio to 16,000 Hz single-channel (mono) WAV using `pydub` and `FFmpeg`.
+### Common failure points
 
-### 3. `core/transcriber.py` (Multilingual STT)
-- **Role**: Converts audio chunks into text.
-- **Key Functions**:
-  - `transcribe_chunk_whisper()`: Local OpenAI Whisper execution for English.
-  - `transcribe_chunk_sarvam()`: Slices audio into 25s pieces and calls Sarvam AI API (`saaras:v2.5`) for Hinglish speech translation.
-  - `get_sarvam_api_key()`: Dynamic API key resolution from environment or Streamlit Secrets.
+| Symptom | Where to look |
+| --- | --- |
+| Video link fails before a transcript appears | Caption availability or access, the RapidAPI configuration, or a download failure. A caught 403 on download asks the user to upload a file. |
+| Media upload fails before transcription | FFmpeg availability, media decoding, unsupported or invalid audio, or local file writes. |
+| Input produces text but insights fail | Provider configuration, network or quota, or model context limits. The three extraction prompts use the full transcript. |
+| Insights finish but chat setup fails | Embedding model availability or vector-store construction. The web pipeline saves its result only after the RAG chain is built. |
+| Chat gives a weak answer | Check the transcript first, then whether the retrieved text could support the answer. Current results show the generated answer without its evidence passages. |
 
-### 4. `core/summarizer.py` (Adaptive Summarizer)
-- **Role**: Summarizes short and long video transcripts.
-- **Key Functions**:
-  - `summarize()`: Automatically selects single-pass for short transcripts (<3,000 chars) or Map-Reduce for long transcripts.
+## Interview follow-ups and defensible answers
 
-### 5. `core/vector_store.py` (In-Memory ChromaDB)
-- **Role**: Manages isolated vector embeddings.
-- **Key Functions**:
-  - `build_vector_store()`: Creates an in-memory Chroma instance with a unique UUID collection name (`video_uuid`).
-
-### 6. `core/rag_engine.py` (RAG Q&A Engine)
-- **Role**: Answers user questions using transcript context.
-- **Key Functions**:
-  - `build_rag_chain()`: Connects retriever (`k=4`) with strict grounding prompts to prevent hallucination.
-
----
-
-## 🎯 Section 5: Top 15 Technical Interview Questions & Answers
-
-#### Q1: How did you solve YouTube HTTP 403 Forbidden errors when deploying to Streamlit Cloud?
-> **Answer**: Streamlit Cloud runs on AWS datacenter IPs, which YouTube blocks. I engineered a multi-tiered ingestion ladder in `utils/audio_processor.py`: it first attempts direct caption extraction via `youtube-transcript-api`, falls back to **RapidAPI residential proxies** (`youtube-transcript3`), and uses `yt-dlp` or direct file uploads as final fallbacks.
-
-#### Q2: How did you prevent cross-video data contamination in RAG Chat?
-> **Answer**: Originally, ChromaDB persisted vector embeddings under a static collection name, causing chunks from previous videos to leak into new video Q&A. I updated `core/vector_store.py` to use **In-Memory ChromaDB** with **UUID-tagged collection names** (`video_a1b2c3d4...`). Every video analysis runs in complete memory isolation.
-
-#### Q3: How did you fix the SQLite `code 1032 attempt to write a readonly database` error on Cloud hosting?
-> **Answer**: On Streamlit Cloud's Linux environment, attempting to overwrite or delete SQLite files (`chroma.sqlite3`) while the Python server process is active causes permission locks. Switching ChromaDB to run **100% in-memory (RAM)** completely eliminated file locks while boosting vector retrieval speed.
-
-#### Q4: Why did you implement single-pass summarization for short transcripts?
-> **Answer**: For short YouTube Shorts or 1-minute videos, Map-Reduce chunking resulted in the LLM outputting conversational meta-talk (*"I am ready to combine..."*). I added adaptive logic: transcripts under 3,000 characters undergo a direct single-pass summary with strict prompt directives forbidding conversational filler.
-
-#### Q5: How does Sarvam AI handle Hinglish audio in your project?
-> **Answer**: Sarvam AI's synchronous API enforces a ≤30 second payload limit per call. In `core/transcriber.py`, `transcribe_chunk_sarvam` uses `pydub` to slice Hinglish audio into 25-second WAV pieces, sends them to Sarvam's `saaras:v2.5` model, and joins the translated English text chunks.
-
-#### Q6: Why choose Groq API (`openai/gpt-oss-20b`) over standard cloud LLMs?
-> **Answer**: Groq's LPU (Language Processing Unit) architecture provides ultra-low latency inference (~300+ tokens/sec) at zero cost on their developer tier, making summarization and RAG Q&A practically instantaneous.
-
-#### Q7: How do you prevent hallucinations in your RAG pipeline?
-> **Answer**: In `core/rag_engine.py`, the system prompt explicitly restricts the LLM: *"Answer the user's question based ONLY on the video transcript context provided below. If the answer is not found, say 'I could not find this information in the video transcript.'"*
-
-#### Q8: What embedding model did you select, and why?
-> **Answer**: HuggingFace's `all-MiniLM-L6-v2`. It generates 384-dimensional dense vectors with low CPU memory overhead and high semantic retrieval performance.
-
-#### Q9: How is audio formatted before feeding into Whisper/STT?
-> **Answer**: The pipeline resamples all input media to single-channel (mono) 16,000 Hz WAV files using `pydub.AudioSegment.set_channels(1).set_frame_rate(16000)`.
-
-#### Q10: How did you optimize Streamlit launch performance?
-> **Answer**: By using lazy module loading (`get_pipeline_modules()`), heavy ML imports (`torch`, `whisper`, `chromadb`) are deferred until user submission, allowing the Streamlit UI to load in **<1 second**.
-
-#### Q11: What text splitter chunk size and overlap did you select for RAG?
-> **Answer**: `chunk_size = 500` characters with `chunk_overlap = 50`. 500 characters corresponds to ~2-3 sentences (ideal granularity for specific Q&A lookup), while the overlap maintains boundary context.
-
-#### Q12: How do you handle UI cards when no action items or key decisions exist?
-> **Answer**: In `app.py`, the UI checks if extracted fields contain "No items found" and dynamically hides empty cards to maintain a clean layout.
-
-#### Q13: How is state maintained across user interactions in Streamlit?
-> **Answer**: Persistence is maintained across script reruns using `st.session_state` (`result`, `chat_history`, `pipeline_done`, `pipeline_steps`).
-
-#### Q14: How did you remove default Streamlit branding?
-> **Answer**: Added CSS rules to `app.py` hiding `#MainMenu`, `footer`, `header`, `[data-testid="stHeader"]`, and `[data-testid="stToolbar"]`.
-
-#### Q15: How would you scale this application for enterprise video processing?
-> **Answer**: 
-> 1. Use background async task queues (**Celery** with **Redis**).
-> 2. Upgrade to GPU acceleration (CUDA) for Whisper or hosted STT APIs.
-> 3. Store embeddings in a distributed cloud vector DB (Pinecone / Qdrant).
-> 4. Use WebSockets to stream real-time transcription and summary tokens.
-
----
-
-## ⚡ Section 5: Summary of Production Trade-offs & Engineering Decisions
-
-| Component | Choice Made | Rationale / Engineering Trade-off |
-| :--- | :--- | :--- |
-| **Ingestion** | Multi-Tier (RapidAPI + Captions + `yt-dlp`) | Bypasses AWS datacenter 403 Forbidden blocks on Streamlit Cloud. |
-| **Vector DB** | In-Memory ChromaDB (UUID Tagged) | 0 SQLite file locks (`code 1032`), 10x faster retrieval, 100% data isolation per video. |
-| **LLM Provider** | Groq API (`openai/gpt-oss-20b`) | Ultra-fast token generation speed (~300 tokens/sec) with zero cost. |
-| **Summarization** | Adaptive (Single-Pass & Map-Reduce) | Direct single-pass for Shorts eliminates conversational LLM filler. |
-| **UI Design** | Streamlit + Custom CSS | Clean, dark-mode, unbranded UI loading in <1 second. |
-
----
-*Updated and verified for Pushpendra Choure — AI Video Assistant Repository*
+| Question | Answer |
+| --- | --- |
+| Why captions before speech-to-text? | Existing captions avoid downloading and transcribing audio. Their availability, accuracy, and language can vary. |
+| Does the app understand visuals? | It analyzes captions and speech. On-screen slides and silent actions are outside that pipeline unless someone describes them aloud. |
+| Why chunk twice? | Summary chunks are larger so each partial summary sees more context. Retrieval chunks are smaller so a question can find a focused passage. Both sizes are heuristic settings. |
+| Why RAG over sending the whole transcript for every question? | It limits the context for longer recordings and focuses the prompt on likely evidence. It can still miss a relevant chunk or discard context split across chunks. |
+| What happens when I analyze a second video? | The app resets the visible result/chat and builds a new collection and chain. The active retriever searches that collection. The code does not explicitly delete old collections or enforce tenant-level access controls. |
+| Does the prompt eliminate hallucinations? | The prompt asks for grounded answers and abstention. Poor captions, missed context, or model behavior can still lead to incorrect answers. I would test answerable and unanswerable questions and measure retrieval recall and answer grounding. |
+| Does it stream or run jobs in parallel? | The analysis runs synchronously, speech segments and map chunks are handled sequentially, and chat displays the completed answer. A longer recording can increase memory use and API calls. |
+| What would you fix before a public rollout? | Use a per-analysis temporary directory and reliable cleanup for uploaded, converted and chunk files. Shared filenames can collide. Restrict accepted sources, avoid logging sensitive Q&A, and give users clear handling of media sent to external services. |
+| What would you improve in retrieval? | Preserve timestamps where available, show supporting excerpts, and test different chunk sizes and `k` values. Add history-aware question rewriting only if follow-up questions are needed. |
+| How would you scale and evaluate it? | Move long jobs to background workers, track stage failures and latency, and evaluate speech accuracy, summary faithfulness and retrieval separately. These are proposed improvements. |
